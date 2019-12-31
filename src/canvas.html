@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html style="height: 100%;" lang="fr">
+<head>
+
+	<title>EXPE</title>
+
+	<!-- Librairie SVG -->
+	<script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.0/dist/svg.min.js"></script>
+
+	<!-- Librairies utilitaires -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/6.2.5/math.js"></script>
+
+	<!-- Fichiers propres à l'expérience -->
+	<script src="moteur.js"></script>
+	<script src="logging.js"></script>
+	<script src="sceneDrawer.js"></script>
+
+</head>
+
+<body style="width: 100%; height: 100%; cursor: none;">
+
+<!-- Interface de sélection de fichier de scénario et de participant -->
+<input type='file' accept='.tsv' onchange='lireScenario(event)' value='scenario.tsv'>
+<label for='Plist'>Participant : </label><select name='Participant' id='Plist' onchange='chargerParticipant(this.value)'></select><br>
+
+<!-- Interface de téléchargement des logs, à la fin de l'expé. -->
+<a id="logButton" href="#">Fichier de logs</a>&nbsp;
+<a id="kinematicButton" href="#">Fichier de cinématiques</a>
+
+<script type="text/javascript">
+
+	// Initialisation du canvas SVG
+	const canvas = SVG().addTo('body').size('100%', '100%');
+
+
+	/********** CURSOR **********/
+
+	// Dimensions des barres du curseur
+	const CursorShort = 3;
+	const CursorLong = 30;
+
+	const mm2pixel = 5;//3.667;
+	const pixel2mm = 1 / mm2pixel;
+	const cursorFeedBackColor = '#6DC4FF';
+	const TargetColor = '#1E1';
+	const DistractorColor = '#666';
+	const HoverColor = '#EE1';
+
+	let cursorFeedBackRadius = 0;
+
+	// Le curseur est un groupe constitué de deux rectangles.
+	const c1 = canvas.rect(CursorShort, CursorLong).dmove(-CursorShort/2, -CursorLong/2);
+	const c2 = canvas.rect(CursorLong, CursorShort).dmove(-CursorLong/2, -CursorShort/2);
+	const cursor = canvas.group().add(c1).add(c2);
+	const cursorFeedBack = canvas.circle(cursorFeedBackRadius);
+	cursorFeedBack.fill({color: cursorFeedBackColor, opacity: 0.75});
+
+	// Position de départ du curseur
+	let CurrentX = 100;
+	let CurrentY = 100;
+	cursor.move(CurrentX, CurrentY);
+	cursorFeedBack.move(CurrentX, CurrentY);
+
+	// Permet de "transférer" les événements curseur (système) en-dessous de l'objet "curseur"
+	cursor.css('pointer-events', 'none');
+
+	// Déplacements du curseur par défaut
+	canvas.mousemove( function(event) {
+		if (event instanceof CustomEvent)
+			return;
+
+		CurrentX = event.offsetX;
+		CurrentY = event.offsetY;
+		cursor.move( CurrentX - CursorLong/2, CurrentY - CursorLong/2 );
+		cursorFeedBack.center(CurrentX, CurrentY);
+	} );
+
+
+	/********** TARGETS **********/
+
+	// Liste des cibles actuellement affichées
+	let CurrentTargets = [];
+
+	class Target {
+
+		constructor(x, y, width, isDistractor) {
+
+			this.x = x;
+			this.y = y;
+			this.width = width * mm2pixel;
+			this.isDistractor = isDistractor;
+
+			this.svg = canvas.rect(this.width, this.width).move(this.x - this.width/2, this.y - this.width/2);
+
+			// Gestions des couleurs des cibles
+
+			this.defaultColor = this.isDistractor ? DistractorColor : TargetColor;
+			this.svg.fill( this.defaultColor );
+
+			this.svg.mouseover( (function( event ) {
+				if (Bubble && event instanceof MouseEvent)
+					return;
+
+				logEvent({
+					EventType: "MouseOver"
+				});
+
+				this.svg.fill( {color: HoverColor} );
+				if (Bubble)
+					this.svg.stroke({ width: 5, color: cursorFeedBackColor});
+				else
+					CurrentSelection = this;
+			} ).bind(this) ); // -> astuce pour pouvoir utiliser "this" dans le bon scope
+
+			this.svg.mouseout( (function( event ) {
+				if (Bubble && event instanceof MouseEvent)
+					return;
+
+				logEvent({
+					EventType: "MouseOut"
+				});
+
+				CurrentSelection = null;
+				this.svg.fill( {color: this.defaultColor} );
+				this.svg.stroke({ width: 0, color: this.defaultColor });
+			} ).bind(this) ); // -> même chose
+
+			CurrentTargets.push( this );
+
+			cursor.front(); // Permet de garder le curseur toujours au premier plan.
+		}
+
+	}
+
+	/********** BUBBLE CURSOR **********/
+
+	let Bubble = true;
+	let CurrentSelection = null;
+
+	canvas.mousemove( function(event) {
+		logEvent({
+			EventType: "MouseMove"
+		});
+
+		if (Bubble) {
+			if (CurrentTargets.length === 0)
+			{
+				cursorFeedBackRadius = 0;
+				return;
+			}
+
+			// D'abord on cherche la cible la plus proche du curseur
+
+			let closestTarget = CurrentTargets[0];
+			let minDist = math.distance( [CurrentX, CurrentY], [closestTarget.x, closestTarget.y] );
+
+			for (let i = 1 ; i < CurrentTargets.length ; i++) {
+
+				const t = CurrentTargets[i];
+				const currentDistance = math.distance( [CurrentX, CurrentY], [t.x, t.y] );
+				if (currentDistance < minDist) {
+					minDist = currentDistance;
+					closestTarget = t;
+				}
+			}
+
+			// L'idée est de provoquer les mêmes comportements que ceux par défaut quand on survole une cible.
+			cursorFeedBack.radius(minDist);
+			cursorFeedBackRadius = minDist;
+
+			if (CurrentSelection === null) {
+				CurrentSelection = closestTarget;
+				CurrentSelection.svg.fire('mouseover');
+			}
+			else if (closestTarget !== CurrentSelection) {
+				CurrentSelection.svg.fire('mouseout');
+				CurrentSelection = closestTarget;
+				CurrentSelection.svg.fire('mouseover');
+			}
+
+		}
+		else
+			cursorFeedBackRadius = 0;
+	} );
+
+	/* DONE feedback visuel du Bubble Cursor (voir https://www.youtube.com/watch?v=JUBXkD_8ZeQ) */
+
+
+	/********** CLIC **********/
+	canvas.click( function(event) {
+		/* DONE que doit-il se passer au clic ?
+            - selon la technique ?
+            - quoi logguer ?
+        */
+		if (!currentTrial)
+			return;
+
+		logEvent({
+			EventType: "Click"
+		});
+
+		if (CurrentSelection !== null && !CurrentSelection.isDistractor) {
+			logTrial({
+				ClickOnTarget: true
+			});
+			trialSuivant();
+		}
+		else {
+			logTrial({
+				ClickOnTarget: false
+			});
+		}
+	} );
+
+	canvas.mousedown(function(event) {
+		if (!currentTrial)
+			return;
+
+		logEvent({
+			EventType: "MouseDown"
+		});
+	});
+
+	canvas.mouseup(function(event) {
+		if (!currentTrial)
+			return;
+
+		logEvent({
+			EventType: "MouseUp"
+		});
+	});
+
+
+	/********** ENREGISTREMENT DES LOGS **********/
+
+	document.getElementById('logButton').onclick = function(event){
+		const blob = new Blob(Resultats);
+		this.href = window.URL.createObjectURL(blob);
+		this.target = '_blank';
+
+		// target filename
+		this.download = 'logs.tsv';
+	};
+
+	document.getElementById('kinematicButton').onclick = function(event){
+		const blob = new Blob(Cinematiques);
+		this.href = window.URL.createObjectURL(blob);
+		this.target = '_blank';
+
+		// target filename
+		this.download = 'cinematiques.tsv';
+	};
+
+	drawSandbox();
+
+</script>
+
+</body>
+</html>

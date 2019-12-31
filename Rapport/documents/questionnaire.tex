@@ -1,0 +1,104 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% End of questionnaire command definitions %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[a4paper,10pt,BCOR=10mm,oneside]{scrartcl}
+\usepackage{wasysym}% provides \ocircle and \Box
+\usepackage{enumitem}% easy control of topsep and leftmargin for lists
+\usepackage{color}% used for background color
+\usepackage{forloop}% used for \Qrating and \Qlines
+\usepackage{ifthen}% used for \Qitem and \QItem
+\usepackage{typearea}
+\areaset{17cm}{26cm}
+\setlength{\topmargin}{-1cm}
+\usepackage{scrlayer-scrpage}
+\pagestyle{scrheadings}
+\ohead{}
+\chead{}
+\cfoot{}
+
+\newcommand{\Qq}[1]{\textbf{#1}}
+\newcommand{\QO}{$\Box$}% or: $\ocircle$
+
+\newcounter{qr}
+\newcommand{\Qrating}[1]{\QO\forloop{qr}{1}{\value{qr} < #1}{---\QO}}
+\newcommand{\Qline}[1]{\noindent\rule{#1}{0.6pt}}
+
+\newcounter{ql}
+\newcommand{\Qlines}[1]{\forloop{ql}{0}{\value{ql}<#1}{\vskip0em\Qline{\linewidth}}}
+
+\newenvironment{Qlist}{
+\renewcommand{\labelitemi}{\QO}
+\begin{itemize}[leftmargin=1.5em,topsep=-.5em]
+}{
+\end{itemize}
+}
+
+\newlength{\qt}
+\newcommand{\Qtab}[2]{
+\setlength{\qt}{\linewidth}
+\addtolength{\qt}{-#1}
+\hfill\parbox[t]{\qt}{\raggedright #2}
+}
+
+\newcounter{itemnummer}
+\newcommand{\Qitem}[2][]{
+\ifthenelse{\equal{#1}{}}{\stepcounter{itemnummer}}{}
+\ifthenelse{\equal{#1}{a}}{\stepcounter{itemnummer}}{}
+\begin{enumerate}[topsep=2pt,leftmargin=2.8em]
+\item[\textbf{\arabic{itemnummer}#1.}] #2
+\end{enumerate}
+}
+
+\definecolor{bgodd}{rgb}{0.8,0.8,0.8}
+\definecolor{bgeven}{rgb}{0.9,0.9,0.9}
+\newcounter{itemoddeven}
+\newlength{\gb}
+\newcommand{\QItem}[2][]{% #1 optional, #2 notwendig
+\setlength{\gb}{\linewidth}
+\addtolength{\gb}{-5.25pt}
+\ifthenelse{\equal{\value{itemoddeven}}{0}}{%
+\noindent\colorbox{bgeven}{\hskip-3pt\begin{minipage}{\gb}\Qitem[#1]{#2}\end{minipage}}%
+\stepcounter{itemoddeven}%
+}{%
+\noindent\colorbox{bgodd}{\hskip-3pt\begin{minipage}{\gb}\Qitem[#1]{#2}\end{minipage}}%
+\setcounter{itemoddeven}{0}%
+}
+}
+
+\begin{document}
+
+\begin{center}
+\textbf{\huge Informations complémentaires}
+\end{center}
+
+\vspace{1em}
+
+\noindent Merci d'avoir participé à notre petite expérimentation portant sur l'évaluation de techniques d'interactions 2 dimensions avec un ordinateur. Merci de bien vouloir prendre quelques instants maintenant afin de remplir ce présent questionnaire.
+
+\vspace{1em}
+
+\noindent \textit{Veuillez noter que ces données ne sont pas obligatoires. Elles ne sont demandées qu'à titre d'évaluation d'expertise informatique du profil de chaque participant, resterons anonymes et aucune donnée ne sera transmise à l'extérieure du cadre des personnes travaillant sur la précédente étude.}
+
+\section*{Questionnaire}
+
+\Qitem{\Qq{Code participant: } \Qline{12.45cm}}
+
+\vspace{0.3em}
+\Qitem{\Qq{Etes vous?} \Qtab{3.75cm}{\QO{} Une femme
+\hskip0.5cm \QO{} Un homme}}
+
+\vspace{0.3em}
+
+\Qitem{ \Qq{Quel âge avez-vous?}: \Qline{12.2cm} }
+
+\vspace{0.3em}
+
+\Qitem{ \Qq{Combien de temps passez vous sur un ordinateur par jour (approximativement, en heures)?}\vspace{0.7em}\Qlines{1} }
+
+\vspace{2em}
+
+\begin{center}
+\textbf{Encore merci d'avoir participé à cette étude et bonne journée à vous}    
+\end{center}
+
+\end{document}
